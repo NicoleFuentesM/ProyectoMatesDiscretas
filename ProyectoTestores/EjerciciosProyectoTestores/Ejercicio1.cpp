@@ -18,6 +18,8 @@
  */
 
 //directivas preprocesador
+#include <algorithm>
+#include <fstream>
 #include <iostream> //Para usar cin (lectura) y cout (impresión en pantalla)
 #include <vector> //Para usar la estructura de datos vector (matriz dinámica) - Vector administra la memoria de manera dinámica, permite cambiar el tamaño en tiempo de ejeciución según ingrese el usuario, ofrece push_back.
 #include <random> //Para la generación de números aleatorios
@@ -92,6 +94,12 @@ vector<vector<int>> obtenerMatrizBasica(const vector<vector<int>>& matriz)
     //Paso A: Eliminar filas duplicados
     for(const auto& fila:matriz)
     {
+        // Una fila nula de la muestra sintética impediría que exista un testor.
+        if (none_of(fila.begin(), fila.end(), [](int valor) { return valor == 1; }))
+        {
+            continue;
+        }
+
         bool estaRepetida = false;
         
         for(const auto& fExistente:sinDuplicados)
@@ -137,14 +145,14 @@ double calcularDensidad(const vector<vector<int>>& mb)
 {
     if(mb.empty() || mb[0].empty()) return 0.0; // si matriz está vacía densidad=0
     
-    int totalUnos=0;
-    int filas=(int)mb.size(); //número de filas en Matriz Básica (m)
-    int columnas=(int)mb[0].size(); //número de columnas en Matriz Básica (n)
+    size_t totalUnos=0;
+    size_t filas=mb.size(); //número de filas en Matriz Básica (m)
+    size_t columnas=mb[0].size(); //número de columnas en Matriz Básica (n)
     
     //Recorre Matriz Básica y acumula los 1s existentes
-    for(int i=0; i<filas; ++i)
+    for(size_t i=0; i<filas; ++i)
     {
-        for(int j=0; j<columnas; ++j)
+        for(size_t j=0; j<columnas; ++j)
         {
             if(mb[i][j]==1)
             {
@@ -153,19 +161,20 @@ double calcularDensidad(const vector<vector<int>>& mb)
         }
     }
     //Aplicar la fórmula de densidad de una matriz D=Total Unos/(m*n)
-    return (double)totalUnos / (filas*columnas);
+    return static_cast<double>(totalUnos) / (static_cast<double>(filas) * columnas);
 }
 
 //función imprime la matriz
-void imprimirMatriz(const vector<vector<int>>& matriz)
+void imprimirMatriz(ostream& salida, const vector<vector<int>>& matriz)
 {
     for(const auto& fila:matriz)
     {
-        for(int val:fila)
+        for (size_t j = 0; j < fila.size(); ++j)
         {
-            cout << val << " ";
+            if (j != 0) salida << ' ';
+            salida << fila[j];
         }
-        cout << endl;
+        salida << '\n';
     }
 }
 
@@ -180,18 +189,28 @@ int main(){
     cout << endl;
     //Entradas de usuario
     cout << "Ingrese el numero de filas (ej.100): ";
-    cin >> filas;
+    if (!(cin >> filas) || filas <= 0)
+    {
+        cerr << "El numero de filas debe ser un entero positivo.\n";
+        return 1;
+    }
     cout << "Ingrese el numero de columnas (ej.10): ";
-    cin >> columnas;
-    
-    //1.Generar la matriz
-    vector<vector<int>> matrizOriginal = generarMatrizAleatoria(filas, columnas);
+    if (!(cin >> columnas) || columnas <= 0)
+    {
+        cerr << "El numero de columnas debe ser un entero positivo.\n";
+        return 1;
+    }
+
+    // Generar y reducir. Repetir si la muestra completa era nula.
+    vector<vector<int>> mb;
+    do
+    {
+        mb = obtenerMatrizBasica(generarMatrizAleatoria(filas, columnas));
+    }
+    while (mb.empty());
     cout << endl;
     cout << "Matriz aleatoria generada con exito: (" << filas << " x " << columnas << ")" << endl;
     cout << endl;
-    
-    //2.Obtener la Matriz Básica
-    vector<vector<int>> mb = obtenerMatrizBasica(matrizOriginal);
     
     //3.Calcular la densidad
     double densidad = calcularDensidad(mb);
@@ -211,12 +230,27 @@ int main(){
     if(mb.size()<=15)
     {
         cout << endl << "Contenido de la Matriz Basica (MB): " << endl;
-        imprimirMatriz(mb);
+        imprimirMatriz(cout, mb);
     }
     else
     {
         cout << endl << "(La MB tiene " << mb.size() << " filas, se omite su impresion en consola por espacio)." << endl;
     }
+    const string nombreArchivo = "matriz_basica.txt";
+    ofstream archivo(nombreArchivo);
+    if (!archivo)
+    {
+        cerr << "No se pudo abrir " << nombreArchivo << " para escritura.\n";
+        return 1;
+    }
+    archivo << mb.size() << ' ' << columnas << '\n';
+    imprimirMatriz(archivo, mb);
+    archivo.close();
+    if (!archivo)
+    {
+        cerr << "No se pudo completar la escritura de " << nombreArchivo << ".\n";
+        return 1;
+    }
+    cout << "Matriz básica guardada en " << nombreArchivo << ".\n";
     return 0;
 }
-
