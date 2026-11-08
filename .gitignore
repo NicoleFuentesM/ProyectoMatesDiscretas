@@ -1,0 +1,5 @@
+# Ejecutables compilados
+*.exe
+
+# Configuración local de VS Code (rutas propias de cada PC)
+.vscode/

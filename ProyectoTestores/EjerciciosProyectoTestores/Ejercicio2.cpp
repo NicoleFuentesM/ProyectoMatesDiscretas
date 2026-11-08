@@ -8,6 +8,7 @@
 #include <iostream>
 #include <vector>
 #include <set>
+#include <algorithm> // Para usar includes (verificar si un conjunto contiene a otro)
 #include <chrono>   // Librería para medir tiempos de ejecución con alta precisión
 #include <iomanip>  // Para dar formato limpio a la salida de consola
 
