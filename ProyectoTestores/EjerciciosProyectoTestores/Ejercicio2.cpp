@@ -296,12 +296,12 @@ int main() {
     cout << "       IMPLEMENTACIÓN COMPUTACIONAL DEL ALGORITMO YYC (EJ. 2.3)\n";
     cout << "====================================================================\n\n";
     cout << "1. Usar la Matriz Básica A (7x7, D = 0.4082) del Ejercicio 2.1\n";
-    cout << "3. Leer una Matriz Básica desde un archivo de texto\n";
+    cout << "2. Leer una Matriz Básica desde un archivo de texto\n";
     cout << "Opción: ";
     // Si la selección no se puede leer o está fuera del menú, se detiene.
     int opcion;
-    if (!(cin >> opcion) || (opcion != 1 && opcion != 3)) {
-        cerr << "Opción inválida. Elija 1 o 3.\n";
+    if (!(cin >> opcion) || (opcion != 1 && opcion != 2)) {
+        cerr << "Opción inválida. Elija 1 o 2.\n";
         return 1;
     }
 
@@ -319,7 +319,7 @@ int main() {
         };
         cout << "\n-> Matriz Básica A cargada exitosamente (7 filas x 7 columnas).\n";
     } else {
-        // Opción 3. Usa la ruta indicada o el nombre por defecto del menú.
+        // Opción 2. Usa la ruta indicada o el nombre por defecto del menú.
         cout << "Ruta del archivo (Enter para matriz_basica.txt): ";
         // Descarta el salto de línea que dejó la lectura de la opción.
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
