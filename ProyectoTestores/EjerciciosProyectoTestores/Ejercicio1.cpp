@@ -1,7 +1,9 @@
 // Ejercicio 1. Genera una matriz booleana de las dimensiones solicitadas,
-// la reduce a una matriz básica (MB) y calcula su densidad.
-// El TXT exporta la última MB para YYC. El historial guarda ambas matrices
-// y la densidad de cada ejecución completada.
+// con una probabilidad de 1 elegida por el usuario, la reduce a una matriz
+// básica (MB) y calcula su densidad.
+// matriz_basica.txt guarda siempre la última MB. Además, cada MB se guarda en
+// una copia numerada (matriz_basica_1.txt, matriz_basica_2.txt, ...) que no se
+// sobrescribe. El historial guarda ambas matrices y la densidad de cada ejecución.
 
 #include <algorithm> // none_of permite detectar una fila de ceros.
 #include <ctime>     // Fecha y hora local de cada registro del historial.
@@ -16,11 +18,13 @@
 using namespace std;
 
 //1. Generación de matriz aleatoria de 0s y 1s
-vector<vector<int>> generarMatrizAleatoria(int filas, int columnas)
+// probabilidadUno es la probabilidad de que cada celda sea 1 (0.5 = igual
+// probabilidad de 0 y de 1). Permite generar matrices de distinta densidad.
+vector<vector<int>> generarMatrizAleatoria(int filas, int columnas, double probabilidadUno)
 {
     random_device rd; // Obtiene un valor inicial para la semilla.
     mt19937 gen(rd()); // Inicia el generador pseudoaleatorio Mersenne Twister.
-    uniform_int_distribution<int> dis(0,1); // Elige 0 o 1 con igual probabilidad.
+    bernoulli_distribution dis(probabilidadUno); // Devuelve 1 con probabilidad probabilidadUno.
 
     // Reserva una fila por cada i y una celda por cada columna j.
     vector<vector<int>> matriz(filas, vector<int>(columnas));
@@ -152,7 +156,8 @@ void imprimirMatriz(ostream& salida, const vector<vector<int>>& matriz)
 // Añade un registro por ejecución al documento Markdown, conservando los anteriores.
 bool guardarHistorial(const string& nombreArchivo,
                       const vector<vector<int>>& matrizOriginal,
-                      const vector<vector<int>>& mb, double densidad)
+                      const vector<vector<int>>& mb, double densidad,
+                      double probabilidadUno, const string& archivoCopia)
 {
     // Prepara el registro completo antes de abrir el documento.
     ostringstream registro;
@@ -163,6 +168,8 @@ bool guardarHistorial(const string& nombreArchivo,
     {
         registro << " | " << put_time(fechaLocal, "%Y-%m-%d %H:%M:%S");
     }
+    registro << "\n\nArchivo: `" << archivoCopia << "` | Probabilidad de 1: "
+             << fixed << setprecision(2) << probabilidadUno;
 
     // Las cercas Markdown mantienen la alineación de las filas al abrir el documento.
     registro << "\n\n### Matriz original (" << matrizOriginal.size() << " x "
@@ -183,6 +190,36 @@ bool guardarHistorial(const string& nombreArchivo,
     historial << registro.str();
     historial.close(); // También permite detectar errores al completar la escritura.
     return static_cast<bool>(historial);
+}
+
+// Escribe la MB en el formato que leen los Ejercicios 2 y 3:
+// primera línea "filas columnas" y luego una fila de bits por línea.
+bool guardarMatrizTxt(const string& nombreArchivo, const vector<vector<int>>& mb)
+{
+    ofstream archivo(nombreArchivo); // Reemplaza el contenido si ya existe.
+    if (!archivo)
+    {
+        return false;
+    }
+    archivo << mb.size() << ' ' << mb.front().size() << '\n';
+    imprimirMatriz(archivo, mb);
+    archivo.close();
+    return static_cast<bool>(archivo);
+}
+
+// Devuelve el primer nombre matriz_basica_N.txt (N = 1, 2, 3, ...) que todavía
+// no existe en la carpeta, para no sobrescribir matrices generadas antes.
+string siguienteNombreLibre()
+{
+    for (int numero = 1; ; ++numero)
+    {
+        const string nombre = "matriz_basica_" + to_string(numero) + ".txt";
+        ifstream existente(nombre);
+        if (!existente)
+        {
+            return nombre;
+        }
+    }
 }
 
 // Lee las dimensiones, genera la muestra, presenta el resultado y guarda los archivos.
@@ -207,6 +244,15 @@ int main(){
         cerr << "El numero de columnas debe ser un entero positivo.\n";
         return 1;
     }
+    // Probabilidad de que cada celda sea 1. Controla la densidad de la matriz
+    // generada (la matriz básica suele quedar con una densidad algo menor).
+    double probabilidadUno{};
+    cout << "Ingrese la probabilidad de que cada celda sea 1 (entre 0 y 1, ej. 0.5): ";
+    if (!(cin >> probabilidadUno) || probabilidadUno <= 0.0 || probabilidadUno > 1.0)
+    {
+        cerr << "La probabilidad debe ser un numero mayor que 0 y menor o igual que 1.\n";
+        return 1;
+    }
 
     // Conserva la misma muestra que se usa para obtener la matriz básica.
     // Si toda la muestra es nula, vuelve a generar antes de guardar el resultado.
@@ -214,7 +260,7 @@ int main(){
     vector<vector<int>> mb;
     do
     {
-        matrizOriginal = generarMatrizAleatoria(filas, columnas);
+        matrizOriginal = generarMatrizAleatoria(filas, columnas, probabilidadUno);
         mb = obtenerMatrizBasica(matrizOriginal);
     }
     while (mb.empty());
@@ -233,6 +279,8 @@ int main(){
     cout << "Filas de la Matriz Original: " << filas << endl;
     cout << "Filas de la Matriz Basica: " << mb.size() << endl;
     cout << "Columnas: " << columnas << endl;
+    cout << fixed << setprecision(2);
+    cout << "Probabilidad de 1 usada al generar: " << probabilidadUno << endl;
     cout << fixed << setprecision(4);
     cout << "Densidad de la Matriz Basica: " << densidad << " (" << densidad*100 << "%)" << endl;
     
@@ -246,28 +294,28 @@ int main(){
     {
         cout << endl << "(La MB tiene " << mb.size() << " filas, se omite su impresion en consola por espacio)." << endl;
     }
-    // El TXT conserva el formato que espera el Ejercicio 2: dimensiones y bits.
-    // ofstream reemplaza su contenido con la matriz básica de esta ejecución.
+    // El TXT conserva el formato que esperan los Ejercicios 2 y 3: dimensiones y bits.
+    // matriz_basica.txt se reemplaza en cada ejecución (siempre es la última MB).
     const string nombreArchivo = "matriz_basica.txt";
-    ofstream archivo(nombreArchivo);
-    if (!archivo)
+    if (!guardarMatrizTxt(nombreArchivo, mb))
     {
-        cerr << "No se pudo abrir " << nombreArchivo << " para escritura.\n";
+        cerr << "No se pudo escribir " << nombreArchivo << ".\n";
         return 1;
     }
-    archivo << mb.size() << ' ' << columnas << '\n';
-    imprimirMatriz(archivo, mb);
-    archivo.close();
-    if (!archivo)
+    // La copia numerada no se sobrescribe, así se conservan todas las MB generadas.
+    const string nombreCopia = siguienteNombreLibre();
+    if (!guardarMatrizTxt(nombreCopia, mb))
     {
-        cerr << "No se pudo completar la escritura de " << nombreArchivo << ".\n";
+        cerr << "No se pudo escribir " << nombreCopia << ".\n";
         return 1;
     }
-    cout << "Matriz básica guardada en " << nombreArchivo << ".\n";
+    cout << endl << "Matriz básica guardada en " << nombreArchivo
+         << " y en " << nombreCopia << ".\n";
 
     // Guarda las dos matrices y su densidad en el historial acumulativo.
     const string nombreHistorial = "historial_matrices.md";
-    if (!guardarHistorial(nombreHistorial, matrizOriginal, mb, densidad))
+    if (!guardarHistorial(nombreHistorial, matrizOriginal, mb, densidad,
+                          probabilidadUno, nombreCopia))
     {
         cerr << "No se pudo guardar el registro en " << nombreHistorial << ".\n";
         return 1;
