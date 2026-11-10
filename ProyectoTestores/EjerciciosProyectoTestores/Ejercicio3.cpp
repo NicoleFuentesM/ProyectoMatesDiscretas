@@ -359,9 +359,6 @@ int main() {
     double totalMs = chrono::duration<double, milli>(Reloj::now() - inicio).count();
     double promedioMs = totalMs / repeticiones;
 
-    // Una segunda corrida, fuera del cronometro, para registrar la traza
-    ResultadoBT r = ejecutarBT(MB, n, true);
-
     cout << "\nMatriz basica (" << MB.size() << " filas x " << n << " columnas):\n";
     cout << "      ";
     for (int j = 1; j <= n; ++j) cout << "x" << j << " ";
@@ -372,27 +369,46 @@ int main() {
         cout << "\n";
     }
 
-    cout << "\n--- RECORRIDO DEL ARBOL BINARIO (solo listas examinadas) ---\n\n";
-    ofstream csv("bt_resultados.csv");
-    imprimirTraza(r, n, csv);
+    // --- Resultados que pide el enunciado (3.2) ------------------------------
+    // Se usan los resultados de la ultima corrida medida.
+    const ResultadoBT& r = medido;
 
     cout << "\nListas examinadas: " << r.examinadas << " de "
          << ((1ULL << n) - 1) << " posibles ("
          << fixed << setprecision(2)
          << 100.0 * r.examinadas / ((1ULL << n) - 1) << "%)\n";
 
+    // Requisito 1: conjunto de testores encontrados
     cout << "\nTestores encontrados por BT (" << r.testores.size() << "):\n";
     for (Mascara t : r.testores)
         cout << "   " << mascaraACadena(t, n) << "  " << mascaraAConjunto(t, n) << "\n";
 
+    // Requisito 2: testores tipicos (identificados durante la ejecucion)
     cout << "\nTestores TIPICOS (" << r.tipicos.size() << "):\n";
     for (Mascara t : r.tipicos)
         cout << "   " << mascaraACadena(t, n) << "  " << mascaraAConjunto(t, n) << "\n";
 
+    // Requisito 3: tiempo total de ejecucion
     cout << "\nTiempo total de ejecucion de BT (promedio de " << repeticiones
          << " corridas): " << fixed << setprecision(6) << promedioMs << " ms\n";
 
-    csv.close();
-    cout << "Traza guardada en bt_resultados.csv.\n";
+    // --- Extra opcional: recorrido del arbol binario -------------------------
+    // En matrices grandes puede tener miles de pasos, por eso se pregunta.
+    char respuesta = 'n';
+    cout << "\nMostrar tambien el recorrido del arbol binario? (s/n): ";
+    cin >> respuesta;
+    if (respuesta == 's' || respuesta == 'S') {
+        // Corrida adicional, fuera del cronometro, que registra cada paso
+        ResultadoBT conTraza = ejecutarBT(MB, n, true);
+        cout << "\n--- RECORRIDO DEL ARBOL BINARIO (solo listas examinadas) ---\n\n";
+        ofstream csv("bt_resultados.csv");
+        imprimirTraza(conTraza, n, csv);
+        cout << "\nTraza guardada en bt_resultados.csv.\n";
+    }
+
+    // Evita que la ventana de consola se cierre antes de leer los resultados
+    cout << "\nPresione Enter para salir...";
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cin.get();
     return 0;
 }
