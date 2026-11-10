@@ -263,10 +263,10 @@ int main() {
     cout << "====================================================================\n";
     cout << "       IMPLEMENTACION COMPUTACIONAL DEL ALGORITMO BT (EJ. 3.2)\n";
     cout << "====================================================================\n\n";
-    cout << "1. Usar la Matriz Basica A (7x7) del Ejercicio 2.1\n";
+    cout << "1. Usar la Matriz Basica A\n";
     cout << "2. Ingresar una Matriz Basica personalizada\n";
     cout << "3. Leer una Matriz Basica desde un archivo de texto\n";
-    cout << "4. Usar la Matriz B (testores tipicos de A, 8x7) del Ejercicio 4.1\n";
+    cout << "4. Usar la Matriz B\n";
     cout << "Opcion: ";
     int opcion;
     if (!(cin >> opcion) || opcion < 1 || opcion > 4) {
