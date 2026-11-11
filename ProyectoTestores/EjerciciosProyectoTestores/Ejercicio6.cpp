@@ -10,7 +10,9 @@
 //       calcula los testores tipicos con YYC, BT y el exhaustivo, comprueba
 //       que los tres conjuntos son exactamente iguales y mide los tiempos.
 //  6.3  Muestra la tabla comparativa y la guarda en tabla_ej6.csv y
-//       tabla_ej6.tex.
+//       tabla_ej6.tex. El enunciado pide matrices de hasta diez columnas:
+//       las que tienen mas se procesan igual, pero se marcan como pruebas
+//       adicionales y se guardan aparte, en tabla_ej6_extra.tex.
 //
 //  YYC y BT son los mismos de Ejercicio2.cpp y Ejercicio3.cpp (BT sin la traza).
 //
@@ -49,6 +51,10 @@ const int MAX_MATRICES = 200;
 // El exhaustivo revisa 2^n - 1 subconjuntos: con mas columnas que estas se
 // vuelve demasiado lento y la tabla de testores no cabe en memoria.
 const int MAX_COLUMNAS = 20;
+
+// El enunciado pide matrices de hasta diez columnas. Las que tienen mas se
+// tratan como pruebas adicionales, para observar el crecimiento 2^n.
+const int COLUMNAS_ENUNCIADO = 10;
 
 // Las corridas se repiten hasta acumular este tiempo (o hasta el maximo de
 // repeticiones) y se reporta el promedio. Se aplica igual a los tres algoritmos.
@@ -407,6 +413,8 @@ ResultadoBT ejecutarBT(const vector<Mascara>& MB, int n) {
 
 struct FilaTabla {
     string nombre;                 // M1, M2, ...
+    int indice = 0;                // 1, 2, ...  (para escribir M_1, M_2, ... en LaTeX)
+    bool extra = false;            // tiene mas de COLUMNAS_ENUNCIADO columnas
     string archivo;
     size_t filas = 0;
     size_t columnas = 0;
@@ -515,7 +523,7 @@ void imprimirFila(const FilaTabla& f) {
          << setw(6) << f.tipicosExhaustivo.size() << setprecision(6)
          << setw(12) << f.msYYC << setw(12) << f.msBT << setw(12) << f.msExhaustivo
          << setw(11) << f.listasBT << setw(11) << f.subconjuntos
-         << setw(11) << (f.coinciden ? "si" : "NO") << endl;
+         << setw(11) << (f.coinciden ? "si" : "NO") << (f.extra ? "  (*)" : "") << endl;
 }
 
 void guardarCsv(const vector<FilaTabla>& tabla, const string& ruta) {
@@ -526,14 +534,15 @@ void guardarCsv(const vector<FilaTabla>& tabla, const string& ruta) {
     }
     csv << "matriz,archivo,filas,columnas,densidad,tt,yyc_ms,bt_ms,exhaustivo_ms,"
         << "bt_listas_examinadas,exhaustivo_subconjuntos,testores_totales,"
-        << "resultados_coinciden\n";
+        << "extra,resultados_coinciden\n";     // extra = 1: mas de diez columnas
     for (const FilaTabla& f : tabla) {
         csv << f.nombre << ',' << f.archivo << ',' << f.filas << ',' << f.columnas << ','
             << fixed << setprecision(4) << f.densidad << ','
             << f.tipicosExhaustivo.size() << ',' << setprecision(6) << f.msYYC << ','
             << f.msBT << ',' << f.msExhaustivo << ',' << f.listasBT << ','
             << f.subconjuntos << ','
-            << f.testores << ',' << (f.coinciden ? "si" : "no") << '\n';
+            << f.testores << ',' << (f.extra ? 1 : 0) << ','
+            << (f.coinciden ? "si" : "no") << '\n';
     }
     cout << "Tabla guardada en " << ruta << ".\n";
 }
@@ -548,27 +557,40 @@ string numeroLatex(double valor, int decimales) {
     return "$" + texto + "$";
 }
 
-// Tabla lista para incluir en el reporte con \input{tabla_ej6} (requiere el
-// paquete booktabs). Los numeros se escriben con coma decimal.
-void guardarLatex(const vector<FilaTabla>& tabla, const string& ruta) {
+// Tabla lista para incluir en el reporte con \input{...} (requiere el paquete
+// booktabs). Los numeros se escriben con coma decimal. Con extra = false se
+// escriben las matrices de hasta diez columnas; con extra = true, las demas.
+void guardarLatex(const vector<FilaTabla>& tabla, const string& ruta, bool extra) {
     ofstream tex(ruta);
     if (!tex) {
         cerr << "No se pudo abrir " << ruta << " para escritura.\n";
         return;
     }
+    const bool hayFilas = any_of(tabla.begin(), tabla.end(),
+                                 [extra](const FilaTabla& f) { return f.extra == extra; });
+    if (!hayFilas) {
+        tex << "% No hay matrices para esta tabla.\n";
+        return;
+    }
     tex << "\\begin{table}[htbp]\n\\centering\n\\small\n";
     tex << "\\setlength{\\tabcolsep}{4pt}\n";   // la tabla tiene 11 columnas
-    tex << "\\caption{Comparaci\\'on de YYC, BT y el algoritmo exhaustivo sobre las "
-        << "matrices b\\'asicas generadas con el Ejercicio 1 (tiempos en ms). "
-        << "\\emph{Listas BT} es el n\\'umero de listas que examina BT y "
-        << "\\emph{Subconj.} el de subconjuntos que revisa el exhaustivo.}\n";
-    tex << "\\label{tab:ej6}\n";
+    if (!extra) {
+        tex << "\\caption{Comparaci\\'on de YYC, BT y el algoritmo exhaustivo sobre las "
+            << "matrices b\\'asicas de hasta diez columnas generadas con el Ejercicio 1 "
+            << "(tiempos en ms). \\emph{Listas BT} es el n\\'umero de listas que examina "
+            << "BT y \\emph{Subconj.} el de subconjuntos que revisa el exhaustivo.}\n";
+        tex << "\\label{tab:ej6}\n";
+    } else {
+        tex << "\\caption{Pruebas adicionales con matrices b\\'asicas de m\\'as de diez "
+            << "columnas, fuera del rango que pide el enunciado (tiempos en ms).}\n";
+        tex << "\\label{tab:ej6extra}\n";
+    }
     tex << "\\begin{tabular}{lrrrrrrrrrc}\n\\toprule\n";
     tex << "Matriz & Filas & Col. & Densidad & TT & YYC & BT & Exhaustivo "
         << "& Listas BT & Subconj. & Iguales \\\\\n\\midrule\n";
-    for (size_t i = 0; i < tabla.size(); ++i) {
-        const FilaTabla& f = tabla[i];
-        tex << "$M_{" << (i + 1) << "}$ & " << f.filas << " & " << f.columnas << " & "
+    for (const FilaTabla& f : tabla) {
+        if (f.extra != extra) continue;
+        tex << "$M_{" << f.indice << "}$ & " << f.filas << " & " << f.columnas << " & "
             << numeroLatex(f.densidad, 4) << " & " << f.tipicosExhaustivo.size() << " & "
             << numeroLatex(f.msYYC, 6) << " & " << numeroLatex(f.msBT, 6) << " & "
             << numeroLatex(f.msExhaustivo, 6) << " & " << f.listasBT << " & "
@@ -614,7 +636,10 @@ void ejecutarExperimento() {
         if (!ifstream(ruta)) continue;       // ese numero no existe
         Matriz M;
         if (!cargarMatriz(ruta, M)) continue;
-        tabla.push_back(procesarMatriz(M, "M" + to_string(tabla.size() + 1), ruta));
+        FilaTabla f = procesarMatriz(M, "M" + to_string(tabla.size() + 1), ruta);
+        f.indice = static_cast<int>(tabla.size()) + 1;
+        f.extra = static_cast<int>(M[0].size()) > COLUMNAS_ENUNCIADO;
+        tabla.push_back(f);
         imprimirFila(tabla.back());
     }
     cout << string(105, '-') << "\n";
@@ -630,19 +655,28 @@ void ejecutarExperimento() {
 
     const bool todoCoincide = all_of(tabla.begin(), tabla.end(),
                                      [](const FilaTabla& f) { return f.coinciden; });
-    cout << "Matrices procesadas: " << tabla.size() << "\n";
+    const size_t extras = static_cast<size_t>(
+        count_if(tabla.begin(), tabla.end(), [](const FilaTabla& f) { return f.extra; }));
+    const size_t principales = tabla.size() - extras;
+    if (extras > 0)
+        cout << "(*) Mas de " << COLUMNAS_ENUNCIADO << " columnas: prueba adicional, fuera "
+             << "del rango que pide el enunciado.\n";
+    cout << "Matrices de hasta " << COLUMNAS_ENUNCIADO << " columnas: " << principales
+         << ". Pruebas adicionales: " << extras << ".\n";
     cout << (todoCoincide
                  ? "Verificacion: YYC, BT y el exhaustivo devolvieron exactamente el mismo "
                    "conjunto\nde testores tipicos en todas las matrices.\n"
                  : "ATENCION: hay matrices donde los conjuntos NO coinciden.\n");
-    if (tabla.size() < 10)
-        cout << "Aviso: el enunciado pide al menos diez matrices.\n";
+    if (principales < 10)
+        cout << "Aviso: el enunciado pide al menos diez matrices de hasta "
+             << COLUMNAS_ENUNCIADO << " columnas.\n";
 
     cout << "\nArchivos usados:\n";
     for (const FilaTabla& f : tabla) cout << "  " << f.nombre << " = " << f.archivo << "\n";
     cout << "\n";
     guardarCsv(tabla, "tabla_ej6.csv");
-    guardarLatex(tabla, "tabla_ej6.tex");
+    guardarLatex(tabla, "tabla_ej6.tex", false);
+    guardarLatex(tabla, "tabla_ej6_extra.tex", true);
 }
 
 void imprimirConjunto(const string& titulo, const set<set<int>>& testores) {
@@ -674,6 +708,9 @@ void ejecutarUnaMatriz() {
          << "):\n";
     if (M.size() <= 30) imprimirMatriz(cout, M);
     else cout << "(se omite la impresion por espacio)\n";
+    if (static_cast<int>(M[0].size()) > COLUMNAS_ENUNCIADO)
+        cout << "Nota: tiene mas de " << COLUMNAS_ENUNCIADO << " columnas; el enunciado pide "
+             << "matrices de hasta " << COLUMNAS_ENUNCIADO << ".\n";
 
     FilaTabla f = procesarMatriz(M, "matriz", ruta);
 
