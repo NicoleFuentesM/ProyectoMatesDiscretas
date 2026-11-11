@@ -54,7 +54,7 @@ const double LIMITE_SEGUNDOS = 300.0;
 // Las corridas muy rapidas se repiten hasta acumular este tiempo (o hasta el
 // maximo de repeticiones) y se reporta el promedio. Se aplica igual a YYC y BT.
 const double TIEMPO_MINIMO_MS = 200.0;
-const int MAX_REPETICIONES = 1000;
+const int MAX_REPETICIONES = 1000000;
 
 // Limites de tamano de esta implementacion.
 const int MAX_COLUMNAS = 62;                 // BT guarda cada lista en 64 bits
@@ -527,6 +527,8 @@ void dimensiones(int op, int N, const Matriz& base,
 struct FilaTabla {
     string nombre;        // p. ej. "theta^2(A)"
     string nombreLatex;   // p. ej. "$\theta^{2}(A)$"
+    int op = 0;           // 1 = phi, 2 = theta, 3 = gamma (para el CSV)
+    int N = 0;
     size_t filas = 0;
     size_t columnas = 0;
     double densidad = 0.0;
@@ -535,14 +537,34 @@ struct FilaTabla {
     bool coincide = true; // los algoritmos devolvieron el mismo conjunto
 };
 
+// Numero para el reporte en LaTeX, con coma decimal: 0.4082 -> $0{,}4082$
+string numeroLatex(double valor, int decimales) {
+    ostringstream s;
+    s << fixed << setprecision(decimales) << valor;
+    string texto = s.str();
+    const size_t punto = texto.find('.');
+    if (punto != string::npos) texto.replace(punto, 1, "{,}");
+    return "$" + texto + "$";
+}
+
+// Tiempo de una corrida para la consola (latex = false) o para el reporte.
 string formatoTiempo(const Medicion& m, bool latex) {
     ostringstream s;
     if (!m.completo) {
-        s << (latex ? "$>$" : ">") << fixed << setprecision(0) << LIMITE_SEGUNDOS << " s";
+        if (latex) s << "$>" << fixed << setprecision(0) << LIMITE_SEGUNDOS << "$ s";
+        else s << ">" << fixed << setprecision(0) << LIMITE_SEGUNDOS << " s";
+    } else if (latex) {
+        s << numeroLatex(m.ms, 4);
     } else {
         s << fixed << setprecision(4) << m.ms;
     }
     return s.str();
+}
+
+// Tiempo para el CSV: una corrida cortada por tiempo se guarda como "nan"
+// para que el archivo siga siendo numerico (lo leen los graficos del reporte).
+string tiempoCsv(const Medicion& m) {
+    return m.completo ? formatoTiempo(m, false) : string("nan");
 }
 
 // Genera O^N(base), mide los cuatro tiempos y verifica los resultados.
@@ -551,6 +573,8 @@ FilaTabla procesarMatriz(int op, int N, const Matriz& base, char letra,
     FilaTabla f;
     f.nombre = string(NOMBRE_OP[op]) + "^" + to_string(N) + "(" + letra + ")";
     f.nombreLatex = string("$") + LATEX_OP[op] + "^{" + to_string(N) + "}(" + letra + ")$";
+    f.op = op + 1;
+    f.N = N;
 
     const Matriz original = potencia(OPERADORES[op], base, N);
     const Matriz ascendente = ordenarAscendente(original);
@@ -622,17 +646,17 @@ void guardarCsv(const vector<FilaTabla>& tabla, const string& ruta) {
         cerr << "No se pudo abrir " << ruta << " para escritura.\n";
         return;
     }
-    csv << "matriz,filas,columnas,densidad,tt,yyc_original_ms,yyc_ascendente_ms,"
+    csv << "matriz,op,n,filas,columnas,densidad,tt,yyc_original_ms,yyc_ascendente_ms,"
         << "bt_original_ms,bt_ascendente_ms,yyc_max_intermedios_original,"
         << "yyc_max_intermedios_ascendente,bt_listas_original,bt_listas_ascendente,"
         << "resultados_coinciden\n";
     for (const FilaTabla& f : tabla) {
-        csv << f.nombre << ',' << f.filas << ',' << f.columnas << ','
-            << fixed << setprecision(4) << f.densidad << ',' << f.tt << ','
-            << formatoTiempo(f.yycOriginal, false) << ','
-            << formatoTiempo(f.yycAscendente, false) << ','
-            << formatoTiempo(f.btOriginal, false) << ','
-            << formatoTiempo(f.btAscendente, false) << ','
+        // op: 1 = phi, 2 = theta, 3 = gamma
+        csv << f.nombre << ',' << f.op << ',' << f.N << ',' << f.filas << ','
+            << f.columnas << ',' << fixed << setprecision(4) << f.densidad << ','
+            << f.tt << ','
+            << tiempoCsv(f.yycOriginal) << ',' << tiempoCsv(f.yycAscendente) << ','
+            << tiempoCsv(f.btOriginal) << ',' << tiempoCsv(f.btAscendente) << ','
             << f.yycOriginal.apoyo << ',' << f.yycAscendente.apoyo << ','
             << f.btOriginal.apoyo << ',' << f.btAscendente.apoyo << ','
             << (f.coincide ? "si" : "no") << '\n';
@@ -640,7 +664,8 @@ void guardarCsv(const vector<FilaTabla>& tabla, const string& ruta) {
     cout << "Tabla guardada en " << ruta << ".\n";
 }
 
-// Tabla lista para incluir en el reporte con \input{...}
+// Tabla lista para incluir en el reporte con \input{tabla_ej5_A} (requiere
+// el paquete booktabs). Los numeros se escriben con coma decimal.
 void guardarLatex(const vector<FilaTabla>& tabla, const string& ruta, char letra) {
     ofstream tex(ruta);
     if (!tex) {
@@ -649,25 +674,27 @@ void guardarLatex(const vector<FilaTabla>& tabla, const string& ruta, char letra
     }
     tex << "\\begin{table}[htbp]\n\\centering\n\\small\n";
     tex << "\\caption{Matrices generadas a partir de $" << letra
-        << "$ y tiempos de ejecuci\\'on (ms) de YYC y BT.}\n";
+        << "$ con los operadores $\\varphi$, $\\theta$ y $\\gamma$, y tiempos de "
+        << "ejecuci\\'on (ms) de YYC y BT con las filas en orden original y en "
+        << "orden ascendente.}\n";
     tex << "\\label{tab:ej5" << letra << "}\n";
-    tex << "\\begin{tabular}{lrrrrrrrr}\n\\hline\n";
+    tex << "\\begin{tabular}{lrrrrrrrr}\n\\toprule\n";
     tex << " & & & & & \\multicolumn{2}{c}{YYC} & \\multicolumn{2}{c}{BT} \\\\\n";
-    tex << "Matriz & Filas & Columnas & Densidad & TT & Original & Ascendente "
-        << "& Original & Ascendente \\\\\n\\hline\n";
-    string operadorAnterior;
+    tex << "\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}\n";
+    tex << "Matriz & Filas & Col. & Densidad & TT & Original & Ascendente "
+        << "& Original & Ascendente \\\\\n\\midrule\n";
+    int operadorAnterior = 0;
     for (const FilaTabla& f : tabla) {
-        const string operador = f.nombre.substr(0, f.nombre.find('^'));
-        if (!operadorAnterior.empty() && operador != operadorAnterior) tex << "\\hline\n";
-        operadorAnterior = operador;
+        if (operadorAnterior != 0 && f.op != operadorAnterior) tex << "\\midrule\n";
+        operadorAnterior = f.op;
         tex << f.nombreLatex << " & " << f.filas << " & " << f.columnas << " & "
-            << fixed << setprecision(4) << f.densidad << " & " << f.tt << " & "
+            << numeroLatex(f.densidad, 4) << " & " << f.tt << " & "
             << formatoTiempo(f.yycOriginal, true) << " & "
             << formatoTiempo(f.yycAscendente, true) << " & "
             << formatoTiempo(f.btOriginal, true) << " & "
             << formatoTiempo(f.btAscendente, true) << " \\\\\n";
     }
-    tex << "\\hline\n\\end{tabular}\n\\end{table}\n";
+    tex << "\\bottomrule\n\\end{tabular}\n\\end{table}\n";
     cout << "Tabla LaTeX guardada en " << ruta << ".\n";
 }
 

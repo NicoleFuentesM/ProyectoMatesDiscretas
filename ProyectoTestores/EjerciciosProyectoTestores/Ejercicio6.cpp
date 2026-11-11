@@ -53,7 +53,7 @@ const int MAX_COLUMNAS = 20;
 // Las corridas se repiten hasta acumular este tiempo (o hasta el maximo de
 // repeticiones) y se reporta el promedio. Se aplica igual a los tres algoritmos.
 const double TIEMPO_MINIMO_MS = 200.0;
-const int MAX_REPETICIONES = 1000;
+const int MAX_REPETICIONES = 1000000;
 
 // ============================================================================
 // ENTRADA Y VALIDACION (copiadas de Ejercicio2.cpp / Ejercicio3.cpp)
@@ -512,7 +512,7 @@ void imprimirEncabezado() {
 void imprimirFila(const FilaTabla& f) {
     cout << left << setw(8) << f.nombre << right << setw(6) << f.filas << setw(6)
          << f.columnas << setw(10) << fixed << setprecision(4) << f.densidad
-         << setw(6) << f.tipicosExhaustivo.size()
+         << setw(6) << f.tipicosExhaustivo.size() << setprecision(6)
          << setw(12) << f.msYYC << setw(12) << f.msBT << setw(12) << f.msExhaustivo
          << setw(11) << f.listasBT << setw(11) << f.subconjuntos
          << setw(11) << (f.coinciden ? "si" : "NO") << endl;
@@ -530,14 +530,26 @@ void guardarCsv(const vector<FilaTabla>& tabla, const string& ruta) {
     for (const FilaTabla& f : tabla) {
         csv << f.nombre << ',' << f.archivo << ',' << f.filas << ',' << f.columnas << ','
             << fixed << setprecision(4) << f.densidad << ','
-            << f.tipicosExhaustivo.size() << ',' << f.msYYC << ',' << f.msBT << ','
-            << f.msExhaustivo << ',' << f.listasBT << ',' << f.subconjuntos << ','
+            << f.tipicosExhaustivo.size() << ',' << setprecision(6) << f.msYYC << ','
+            << f.msBT << ',' << f.msExhaustivo << ',' << f.listasBT << ','
+            << f.subconjuntos << ','
             << f.testores << ',' << (f.coinciden ? "si" : "no") << '\n';
     }
     cout << "Tabla guardada en " << ruta << ".\n";
 }
 
-// Tabla lista para incluir en el reporte con \input{tabla_ej6}
+// Numero para el reporte en LaTeX, con coma decimal: 0.4082 -> $0{,}4082$
+string numeroLatex(double valor, int decimales) {
+    ostringstream s;
+    s << fixed << setprecision(decimales) << valor;
+    string texto = s.str();
+    const size_t punto = texto.find('.');
+    if (punto != string::npos) texto.replace(punto, 1, "{,}");
+    return "$" + texto + "$";
+}
+
+// Tabla lista para incluir en el reporte con \input{tabla_ej6} (requiere el
+// paquete booktabs). Los numeros se escriben con coma decimal.
 void guardarLatex(const vector<FilaTabla>& tabla, const string& ruta) {
     ofstream tex(ruta);
     if (!tex) {
@@ -545,21 +557,24 @@ void guardarLatex(const vector<FilaTabla>& tabla, const string& ruta) {
         return;
     }
     tex << "\\begin{table}[htbp]\n\\centering\n\\small\n";
-    tex << "\\caption{Comparaci\\'on de YYC, BT y el algoritmo exhaustivo "
-        << "(tiempos en ms).}\n";
+    tex << "\\setlength{\\tabcolsep}{4pt}\n";   // la tabla tiene 11 columnas
+    tex << "\\caption{Comparaci\\'on de YYC, BT y el algoritmo exhaustivo sobre las "
+        << "matrices b\\'asicas generadas con el Ejercicio 1 (tiempos en ms). "
+        << "\\emph{Listas BT} es el n\\'umero de listas que examina BT y "
+        << "\\emph{Subconj.} el de subconjuntos que revisa el exhaustivo.}\n";
     tex << "\\label{tab:ej6}\n";
-    tex << "\\begin{tabular}{lrrrrrrrrrc}\n\\hline\n";
+    tex << "\\begin{tabular}{lrrrrrrrrrc}\n\\toprule\n";
     tex << "Matriz & Filas & Col. & Densidad & TT & YYC & BT & Exhaustivo "
-        << "& Listas BT & Subconj. & Iguales \\\\\n\\hline\n";
+        << "& Listas BT & Subconj. & Iguales \\\\\n\\midrule\n";
     for (size_t i = 0; i < tabla.size(); ++i) {
         const FilaTabla& f = tabla[i];
         tex << "$M_{" << (i + 1) << "}$ & " << f.filas << " & " << f.columnas << " & "
-            << fixed << setprecision(4) << f.densidad << " & "
-            << f.tipicosExhaustivo.size() << " & " << f.msYYC << " & " << f.msBT
-            << " & " << f.msExhaustivo << " & " << f.listasBT << " & "
+            << numeroLatex(f.densidad, 4) << " & " << f.tipicosExhaustivo.size() << " & "
+            << numeroLatex(f.msYYC, 6) << " & " << numeroLatex(f.msBT, 6) << " & "
+            << numeroLatex(f.msExhaustivo, 6) << " & " << f.listasBT << " & "
             << f.subconjuntos << " & " << (f.coinciden ? "S\\'i" : "No") << " \\\\\n";
     }
-    tex << "\\hline\n\\end{tabular}\n\\end{table}\n";
+    tex << "\\bottomrule\n\\end{tabular}\n\\end{table}\n";
     cout << "Tabla LaTeX guardada en " << ruta << ".\n";
 }
 
